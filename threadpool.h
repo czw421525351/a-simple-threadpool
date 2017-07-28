@@ -6,24 +6,32 @@
 #define SOCKET_PROGRAM_THREADPOOL_H
 
 #include <queue>
+#include <boost/bind.hpp>
+using boost::bind;
+#include <boost/function.hpp>
+using boost::function;
 #include "condition.h"
 
+/*
 struct Task
 {
 private:
-    typedef void* (*TaskRoutine)(void* args);   //修改为用boost:：function来写
-    typedef void* Args;
+    //typedef void* (*TaskRoutine)(void* args);   //修改为用boost:：function来写
+    typedef function<void*()>  TaskRoutine;
+//    typedef void* Args;
 public:
-    Task(TaskRoutine taskRoutine, Args args):taskRoutine_(taskRoutine),\
-                                                args_(args){}
+//    Task(TaskRoutine taskRoutine, Args args):taskRoutine_(taskRoutine),args_(args){}
+
+    Task(TaskRoutine taskRoutine):taskRoutine_(taskRoutine){}
     TaskRoutine taskRoutine_;
-    Args args_;
+//    Args args_;
 };
+*/
 
 class ThreadPool
 {
 public:
-    typedef void* (*TaskRoutine)(void* args);
+    typedef function<void*()>  TaskRoutine;
     typedef void* Args;
 
     ThreadPool(int maxThreads = 3):counter(0),idle(0),\
@@ -36,9 +44,9 @@ public:
     bool quit;
 
     Condition condition;
-    std::queue<Task*> taskQueue;
+    std::queue<TaskRoutine> taskQueue;
 
-    void threadpool_add_task(TaskRoutine, Args); //这不能这样写 用Task就好
+    void threadpool_add_task(TaskRoutine); //这不能这样写 用Task就好
     void threadpool_destroy();
 
     void thread_detach(pthread_t);

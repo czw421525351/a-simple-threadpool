@@ -21,12 +21,12 @@ void* ThreadPool::threadRoutine(void *args)
         timeout = 0;//超时标记
         pool->condition.condition_lock();
         pool->idle++;
-        while (pool->taskQueue.empty() && !pool->quit)
+        while (pool->taskQueue.empty() && !(pool->quit))
         {
             printf("----------thread%ld-----is waitting-----\n",pthread_self());
             //pool->condition.condition_wait();
             clock_gettime(CLOCK_REALTIME,&abstime);
-            abstime.tv_sec += 3;                        //设定超时时间是3秒
+            abstime.tv_sec += 2;                        //设定超时时间是3秒
             int status = pool->condition.condition_timewait(abstime);
             if(status == ETIMEDOUT)
             {
@@ -39,16 +39,15 @@ void* ThreadPool::threadRoutine(void *args)
         pool->idle--;
         if (!(pool->taskQueue.empty()))
         {         //等待到任务
-            Task *ptask = pool->taskQueue.front();//取出任务
+            TaskRoutine task = pool->taskQueue.front();//取出任务
             pool->taskQueue.pop();                //弹出任务
 
             pool->condition.condition_unlock();   //处理任务之前 先解锁 因为等待到条件时自动获取了一把锁
 
-            int task_args = *(int *) (ptask->args_);
-            printf("----------thread%ld-----is working on task%d-----\n", pthread_self(), task_args);
-            ptask->taskRoutine_(ptask->args_);    //执行任务
-            printf("----------thread%ld-----has finished task%d-----\n", pthread_self(), task_args);
-            delete (ptask);                       //销毁任务
+//            ptask->taskRoutine_();                //执行任务
+            task();
+
+//            delete (ptask);                       //销毁任务
 
             pool->condition.condition_lock();     //这里加锁是因为循环最后有解锁操作
         }
@@ -57,7 +56,7 @@ void* ThreadPool::threadRoutine(void *args)
             pool->counter--;                       //当前线程数减1
 
             if(pool->counter == 0)
-                pool->condition.condition_signal();      //用于唤醒主线程
+                pool->condition.condition_signal();//用于唤醒主线程
 
             pool->condition.condition_unlock();    //break 之前要先解锁 因为等待到条件时自动获取了一把锁
             break;
@@ -75,15 +74,15 @@ void* ThreadPool::threadRoutine(void *args)
 }
 
 
-void ThreadPool::threadpool_add_task(TaskRoutine taskRoutine, Args args) //改成boost：:function
+void ThreadPool::threadpool_add_task(TaskRoutine taskRoutine)
 {
-    Task* ptask = new Task(taskRoutine,args);
-    ptask->taskRoutine_ = taskRoutine;
-    ptask->args_ = args;
+//    Task* ptask = new Task(taskRoutine);
+//    ptask->taskRoutine_ = taskRoutine;
 
     condition.condition_lock();    //加锁
 
-    taskQueue.push(ptask);
+    taskQueue.push(taskRoutine);
+//    taskQueue.push(ptask);
 
     if(idle > 0)//如果有等待线程则唤醒
         condition.condition_signal();
